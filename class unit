@@ -1,0 +1,132 @@
+import random
+
+class Unit:
+    def __init__(self, name, domain):
+        self.name = name
+        self.domain = domain
+        self.cooldown = 0
+
+    def is_ready(self):
+        return self.cooldown == 0
+
+    def apply_effect(self, player, enemy, game):
+        raise NotImplementedError
+
+    def tick(self):
+        if self.cooldown > 0:
+            self.cooldown -= 1
+
+class Economics(Unit):
+    def __init__(self):
+        super().__init__("Economics", "resource depletion")
+
+    def apply_effect(self, player, enemy, game):
+        enemy.speed_penalty = 5
+        self.cooldown = 2
+        print(f"{player.name}'s Economics slows down {enemy.name} for 5 turns")
+
+class Cyber(Unit):
+    def __init__(self):
+        super().__init__("Cyber", "command depletion")
+
+    def apply_effect(self, player, enemy, game):
+        enemy.confused_turns = 1
+        self.cooldown = 3
+        print(f"{player.name}'s Cyber confuses {enemy.name}'s next unit choice")
+
+class Diplomacy(Unit):
+    def __init__(self):
+        super().__init__("Diplomacy", "conflict depletion")
+
+    def apply_effect(self, player, enemy, game):
+        game.no_damage = True
+        self.cooldown = 4
+        print(f"{player.name}'s Diplomacy prevents all damage this turn")
+
+class Army(Unit):
+    def __init__(self):
+        super().__init__("Army", "attack forces")
+
+    def apply_effect(self, player, enemy, game):
+        if not game.no_damage:
+            enemy.hp -= 5
+            print(f"{player.name}'s Army hits {enemy.name} for 5 damage")
+        else:
+            print(f"{player.name}'s Army attack is nullified by Diplomacy")
+        self.cooldown = 1
+
+class Navy(Unit):
+    def __init__(self):
+        super().__init__("Navy", "projection forces")
+        self.charging = False
+
+    def apply_effect(self, player, enemy, game):
+        if self.charging:
+            if not game.no_damage:
+                enemy.hp -= 10
+                print(f"{player.name}'s Navy finishes charge and hits {enemy.name} for 10 damage")
+            else:
+                print(f"{player.name}'s Navy attack is nullified by Diplomacy")
+            self.charging = False
+            self.cooldown = 2
+        else:
+            self.charging = True
+            print(f"{player.name}'s Navy begins charging")
+
+class Player:
+    def __init__(self, name):
+        self.name = name
+        self.hp = 30
+        self.units = [Economics(), Cyber(), Diplomacy(), Army(), Navy()]
+        self.current_unit = None
+        self.speed_penalty = 0
+        self.confused_turns = 0
+
+    def choose_unit(self):
+        available_units = [u for u in self.units if u.is_ready()]
+        if self.confused_turns > 0:
+            self.confused_turns -= 1
+            self.current_unit = random.choice(available_units)
+            print(f"{self.name} is confused and randomly selects {self.current_unit.name}")
+        else:
+            self.current_unit = random.choice(available_units)  # For now, random (replace with decision logic)
+            print(f"{self.name} selects {self.current_unit.name}")
+
+    def tick_units(self):
+        for unit in self.units:
+            unit.tick()
+
+class Game:
+    def __init__(self, player1, player2):
+        self.player1 = player1
+        self.player2 = player2
+        self.turn = 0
+        self.no_damage = False
+
+    def play_turn(self):
+        print(f"\n-- Turn {self.turn + 1} --")
+        self.no_damage = False
+
+        self.player1.tick_units()
+        self.player2.tick_units()
+
+        self.player1.choose_unit()
+        self.player2.choose_unit()
+
+        self.player1.current_unit.apply_effect(self.player1, self.player2, self)
+        self.player2.current_unit.apply_effect(self.player2, self.player1, self)
+
+        print(f"State: {self.player1.name} HP = {self.player1.hp}, {self.player2.name} HP = {self.player2.hp}")
+        self.turn += 1
+
+    def play_game(self):
+        while self.player1.hp > 0 and self.player2.hp > 0:
+            self.play_turn()
+        winner = self.player1.name if self.player1.hp > 0 else self.player2.name
+        print(f"\n{winner} wins after {self.turn} turns!")
+
+# Initialize and run game
+p1 = Player("Alliance")
+p2 = Player("Coalition")
+game = Game(p1, p2)
+game.play_game()
